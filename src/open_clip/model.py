@@ -16,7 +16,7 @@ from torch.utils.checkpoint import checkpoint
 from .hf_model import HFTextEncoder
 from .modified_resnet import ModifiedResNet
 from .timm_model import TimmModel
-from .transformer import LayerNormFp32, LayerNorm, QuickGELU, Attention, VisionTransformer, TextTransformer
+from .transformer import LayerNormFp32, LayerNorm, QuickGELU, Attention, VisionTransformer, TextTransformer, PatchDropout
 from .utils import to_2tuple
 
 
@@ -45,6 +45,8 @@ class CLIPVisionCfg:
     timm_proj_bias: bool = False  # enable bias final projection
     timm_drop: float = 0.  # head dropout
     timm_drop_path: Optional[float] = None  # backbone stochastic depth
+
+    bcos: Optional[bool] = True
 
 
 @dataclass
@@ -119,6 +121,19 @@ def _build_vision_tower(
             image_size=vision_cfg.image_size,
             width=vision_cfg.width,
         )
+    elif vision_cfg.bcos:
+        print("creating a bcos model")
+        visual = torch.hub.load('B-cos/B-cos-v2', 'simple_vit_b_patch16_224', pretrained=True)
+
+        visual = visual[0]  # remove the logits layer
+
+        visual[0].linear_head[1] = nn.Identity()  # remove the classifier
+
+        if vision_cfg.patch_dropout > 0:
+            visual.transformer = nn.Sequential(
+                PatchDropout(vision_cfg.patch_dropout) if vision_cfg.patch_dropout > 0. else nn.Identity(),
+                visual.transformer
+            )
     else:
         vision_heads = vision_cfg.width // vision_cfg.head_width
         norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
