@@ -123,17 +123,19 @@ def _build_vision_tower(
         )
     elif vision_cfg.bcos:
         print("creating a bcos model")
-        visual = torch.hub.load('B-cos/B-cos-v2', 'simple_vit_b_patch16_224', pretrained=True)
+        visual = torch.hub.load('B-cos/B-cos-v2', 'simple_vit_b_patch16_224', channels=3)
 
         visual = visual[0]  # remove the logits layer
 
-        visual[0].linear_head[1] = nn.Identity()  # remove the classifier
+        visual.linear_head[1] = nn.Identity()  # remove the classifier
 
         if vision_cfg.patch_dropout > 0:
             visual.transformer = nn.Sequential(
                 PatchDropout(vision_cfg.patch_dropout) if vision_cfg.patch_dropout > 0. else nn.Identity(),
                 visual.transformer
             )
+
+        visual.image_size = vision_cfg.image_size
     else:
         vision_heads = vision_cfg.width // vision_cfg.head_width
         norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
