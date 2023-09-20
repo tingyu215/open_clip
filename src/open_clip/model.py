@@ -46,7 +46,6 @@ class CLIPVisionCfg:
     timm_drop: float = 0.  # head dropout
     timm_drop_path: Optional[float] = None  # backbone stochastic depth
 
-    bcos: Optional[bool] = True
 
 
 @dataclass
@@ -89,11 +88,10 @@ def _build_vision_tower(
         embed_dim: int,
         vision_cfg: CLIPVisionCfg,
         quick_gelu: bool = False,
-        cast_dtype: Optional[torch.dtype] = None
+        cast_dtype: Optional[torch.dtype] = None,
 ):
     if isinstance(vision_cfg, dict):
         vision_cfg = CLIPVisionCfg(**vision_cfg)
-
     # OpenAI models are pretrained w/ QuickGELU but native nn.GELU is both faster and more
     # memory efficient in recent PyTorch releases (>= 1.10).
     # NOTE: timm models always use native GELU regardless of quick_gelu flag.
@@ -216,7 +214,6 @@ class CLIP(nn.Module):
         super().__init__()
         self.output_dict = output_dict
         self.visual = _build_vision_tower(embed_dim, vision_cfg, quick_gelu, cast_dtype)
-
         text = _build_text_tower(embed_dim, text_cfg, quick_gelu, cast_dtype)
         self.transformer = text.transformer
         self.context_length = text.context_length
